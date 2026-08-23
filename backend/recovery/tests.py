@@ -39,6 +39,15 @@ class TransactionGeneratorTest(TestCase):
         
         self.assertNotEqual(batch1_amounts, batch2_amounts)
 
+    def test_clear_option(self):
+        # Generate initial batch
+        call_command('generate_transactions', count=50, seed=1)
+        self.assertTrue(Transaction.objects.count() >= 50)
+        
+        # Generate new batch with --clear
+        call_command('generate_transactions', count=20, seed=2, clear=True)
+        self.assertEqual(Transaction.objects.count(), 20)
+
 class RevenueSummaryViewTest(TestCase):
     def test_summary_api(self):
         call_command('generate_transactions', count=10, seed=123)

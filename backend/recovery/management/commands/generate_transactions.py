@@ -9,12 +9,19 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--count', type=int, default=10000, help='Number of transactions to generate')
         parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
+        parser.add_argument('--clear', action='store_true', help='Clear existing transactions before generating')
 
     def handle(self, *args, **options):
         count = options['count']
         seed = options['seed']
+        clear = options['clear']
+
+        if clear:
+            self.stdout.write('Clearing existing transactions...')
+            Transaction.objects.all().delete()
 
         np.random.seed(seed)
+
         
         self.stdout.write(f'Generating {count} transactions with seed {seed}...')
 
