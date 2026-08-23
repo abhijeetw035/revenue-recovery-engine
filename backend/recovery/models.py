@@ -59,3 +59,26 @@ class ExperimentResult(models.Model):
 
     class Meta:
         unique_together = ('experiment', 'treatment', 'segment')
+
+class Policy(models.Model):
+    """
+    One record per (segment, version).  The latest active version for a
+    segment is the current policy for that segment.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    segment = models.CharField(max_length=100, db_index=True)
+    action = models.CharField(max_length=50)          # e.g. 'DELAYED_RETRY' or 'NONE'
+    version = models.PositiveIntegerField()            # monotonically increasing per segment
+    source_experiment = models.ForeignKey(
+        Experiment, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='policies'
+    )
+    reason = models.TextField()                        # human-readable explanation
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('segment', 'version')
+        ordering = ['-version']
+
+    def __str__(self):
+        return f"Policy v{self.version} | {self.segment} → {self.action}"
