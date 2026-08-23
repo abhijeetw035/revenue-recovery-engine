@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from recovery.views import RevenueSummaryView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/summary/', RevenueSummaryView.as_view(), name='revenue-summary'),
 ]

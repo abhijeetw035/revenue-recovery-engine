@@ -38,3 +38,15 @@ class TransactionGeneratorTest(TestCase):
         batch2_amounts = list(Transaction.objects.all().values_list('amount', flat=True))
         
         self.assertNotEqual(batch1_amounts, batch2_amounts)
+
+class RevenueSummaryViewTest(TestCase):
+    def test_summary_api(self):
+        call_command('generate_transactions', count=10, seed=123)
+        response = self.client.get('/api/summary/')
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['data']['transaction_count'], 10)
+        self.assertTrue(data['data']['revenue_at_risk'] > 0)
+
