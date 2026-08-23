@@ -106,6 +106,5 @@ def simulate_outcome(transaction_amount, payment_method, failure_reason, band, a
     return {
         'recovered': bool(recovered),
         'recovered_amount': recovered_amount,
-        'cost': total_cost,
-        'true_prob': final_prob # Keeping this inside the simulator only for testing/validation purposes! DO NOT expose to engine.
+        'cost': total_cost
     }

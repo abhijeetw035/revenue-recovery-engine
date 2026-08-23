@@ -40,3 +40,22 @@ class Outcome(models.Model):
     
     class Meta:
         unique_together = ('experiment', 'transaction')
+
+class ExperimentResult(models.Model):
+    """Stores the lift analysis result for one treatment arm vs control."""
+    experiment = models.ForeignKey(Experiment, on_delete=models.CASCADE, related_name='results')
+    segment = models.CharField(max_length=100)
+    treatment = models.CharField(max_length=50)  # The treatment arm name
+    control_n = models.IntegerField()             # Control group sample size
+    treatment_n = models.IntegerField()           # Treatment group sample size
+    control_rate = models.FloatField()            # Control recovery rate
+    treatment_rate = models.FloatField()          # Treatment recovery rate
+    lift = models.FloatField()                    # Absolute lift = treatment_rate - control_rate
+    ci_lower = models.FloatField()               # 95% CI lower bound
+    ci_upper = models.FloatField()               # 95% CI upper bound
+    evidence_status = models.CharField(max_length=30)  # INSUFFICIENT_SAMPLE, POSITIVE, NEGATIVE, NEUTRAL
+    sufficient_sample = models.BooleanField()    # Whether sample size meets minimum threshold
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('experiment', 'treatment', 'segment')
