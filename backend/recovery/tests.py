@@ -141,3 +141,86 @@ class SimulatorTest(TestCase):
         # Also incurs huge friction cost (50 * 5000 = 250,000)
         self.assertTrue(cost_retry >= 200000.0)
 
+class ExperimentEngineTest(TestCase):
+    def setUp(self):
+        # Generate a small dataset for testing the engine
+        call_command('generate_transactions', count=1000, seed=42)
+        # Find a segment that has some transactions
+        self.target_segment = Transaction.objects.first().segment
+        self.eligible_count = Transaction.objects.filter(segment=self.target_segment).count()
+
+    def test_create_and_assign_experiment(self):
+        from recovery.experiment_engine import ExperimentEngine
+        from recovery.models import Experiment, Assignment
+        
+        experiment = ExperimentEngine.create_and_assign_experiment(
+            target_segment=self.target_segment,
+            arms=['NONE', 'IMMEDIATE_RETRY'],
+            random_seed=123
+        )
+        
+        self.assertEqual(experiment.status, 'CREATED')
+        self.assertEqual(experiment.target_segment, self.target_segment)
+        
+        # Check eligibility (only transactions in segment were assigned)
+        assignments = Assignment.objects.filter(experiment=experiment)
+        self.assertEqual(assignments.count(), self.eligible_count)
+        
+        for assignment in assignments:
+            self.assertEqual(assignment.transaction.segment, self.target_segment)
+            
+        # Check balance
+        none_count = assignments.filter(arm='NONE').count()
+        retry_count = assignments.filter(arm='IMMEDIATE_RETRY').count()
+        
+        # Should be reasonably balanced (within a margin of error)
+        # Using a wide margin for small samples, but they should both have assignments
+        self.assertTrue(none_count > 0)
+        self.assertTrue(retry_count > 0)
+        
+    def test_reproducibility(self):
+        from recovery.experiment_engine import ExperimentEngine
+        from recovery.models import Assignment
+        
+        exp1 = ExperimentEngine.create_and_assign_experiment(
+            target_segment=self.target_segment,
+            arms=['NONE', 'SMS'],
+            random_seed=999
+        )
+        arms1 = list(Assignment.objects.filter(experiment=exp1).order_by('transaction_id').values_list('arm', flat=True))
+        
+        exp2 = ExperimentEngine.create_and_assign_experiment(
+            target_segment=self.target_segment,
+            arms=['NONE', 'SMS'],
+            random_seed=999
+        )
+        arms2 = list(Assignment.objects.filter(experiment=exp2).order_by('transaction_id').values_list('arm', flat=True))
+        
+        # Exact same seed should result in exact same assignment order
+        self.assertEqual(arms1, arms2)
+        
+    def test_execute_experiment(self):
+        from recovery.experiment_engine import ExperimentEngine
+        from recovery.models import Outcome
+        
+        experiment = ExperimentEngine.create_and_assign_experiment(
+            target_segment=self.target_segment,
+            arms=['NONE', 'DELAYED_RETRY'],
+            random_seed=456
+        )
+        
+        experiment = ExperimentEngine.execute_experiment(experiment)
+        
+        self.assertEqual(experiment.status, 'COMPLETED')
+        
+        # Check outcomes are stored for every assignment
+        outcomes = Outcome.objects.filter(experiment=experiment)
+        self.assertEqual(outcomes.count(), self.eligible_count)
+        
+        # Check we captured observable data
+        sample_outcome = outcomes.first()
+        self.assertIsNotNone(sample_outcome.recovered)
+        self.assertIsNotNone(sample_outcome.recovered_amount)
+        self.assertIsNotNone(sample_outcome.intervention_cost)
+
+
