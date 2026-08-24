@@ -251,3 +251,56 @@ class EndToEndPolicyTest(TestCase):
         self.assertEqual(policy.version, 1)
         self.assertIsNotNone(policy.source_experiment)
         self.assertIn('DELAYED_RETRY', policy.reason)
+
+
+class DemoScenarioTest(TestCase):
+    """
+    Tests specific to the demo script's requirements:
+    Ensuring clean state, accurate evidence logging, and no stale state.
+    """
+
+    def test_clean_demo_state_and_accurate_evidence(self):
+        segment = 'UPI | Insufficient Funds | MID_VALUE'
+        
+        # 1. Setup mock pre-existing state to simulate a previous demo run
+        call_command('generate_transactions', count=50, seed=10)
+        old_exp = Experiment.objects.create(target_segment=segment, arms=['NONE'], random_seed=10)
+        Policy.objects.create(
+            segment=segment, action='DELAYED_RETRY', version=1,
+            source_experiment=old_exp, reason="stale evidence lift=+0.999"
+        )
+        
+        # 2. Perform the demo's reset
+        Policy.objects.filter(segment=segment).delete()
+        Experiment.objects.filter(target_segment=segment).delete()
+        
+        # Verify clean state
+        self.assertIsNone(get_current_policy(segment))
+        self.assertEqual(get_policy_for_segment(segment), 'NONE')
+
+        # 3. Run the new demo experiment
+        call_command('generate_transactions', count=3000, seed=42, clear=True)
+        exp = ExperimentEngine.create_and_assign_experiment(
+            target_segment=segment,
+            arms=['NONE', 'DELAYED_RETRY'],
+            random_seed=888
+        )
+        exp = ExperimentEngine.execute_experiment(exp)
+        results = analyze_experiment(exp)
+        
+        # 4. Update policy
+        new_policy = update_policy(exp, results)
+        
+        # 5. Verify the new policy reflects ONLY the current experiment's exact evidence
+        self.assertIsNotNone(new_policy)
+        self.assertEqual(new_policy.version, 1) # Must be v1 because we cleared!
+        self.assertEqual(new_policy.source_experiment, exp)
+        
+        # Find the actual result for DELAYED_RETRY to verify the reason string
+        dr_result = next(r for r in results if r.treatment == 'DELAYED_RETRY')
+        self.assertNotIn("+0.999", new_policy.reason) # Stale evidence must not appear
+        self.assertIn(f"lift={dr_result.lift:+.3f}", new_policy.reason)
+        self.assertIn(f"[{dr_result.ci_lower:+.3f}, {dr_result.ci_upper:+.3f}]", new_policy.reason)
+        self.assertIn(f"n_treatment={dr_result.treatment_n}", new_policy.reason)
+        self.assertIn(f"n_control={dr_result.control_n}", new_policy.reason)
+        self.assertIn(str(exp.id), new_policy.reason)
