@@ -113,6 +113,12 @@ def analyze_experiment(experiment):
         treatment_recovered = treatment_outcomes.filter(recovered=True).count()
         treatment_rate = treatment_recovered / treatment_n if treatment_n > 0 else 0.0
 
+        # Calculate average intervention cost for the treatment arm
+        # Using a list comprehension or aggregate; aggregate is safer if many records, but we already have treatment_outcomes
+        from django.db.models import Avg
+        cost_agg = treatment_outcomes.aggregate(Avg('intervention_cost'))
+        average_cost = float(cost_agg['intervention_cost__avg'] or 0.0)
+
         # --- Statistical calculations ---
         lift = treatment_rate - control_rate
         ci_lower, ci_upper = _lift_ci(treatment_rate, treatment_n, control_rate, control_n)
@@ -134,6 +140,7 @@ def analyze_experiment(experiment):
                 'ci_upper': ci_upper,
                 'evidence_status': evidence_status,
                 'sufficient_sample': sufficient_sample,
+                'average_cost': average_cost,
             }
         )
         results.append(result)

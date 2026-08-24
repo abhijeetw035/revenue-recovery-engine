@@ -10,6 +10,10 @@ class Transaction(models.Model):
     segment = models.CharField(max_length=100)
     risk_level = models.CharField(max_length=20)
     
+    # Day 6 Safety tracking fields
+    attempt_count = models.IntegerField(default=0)
+    status = models.CharField(max_length=20, default='PENDING') # PENDING, HUMAN_REVIEW, STOPPED, RECOVERED
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -55,6 +59,7 @@ class ExperimentResult(models.Model):
     ci_upper = models.FloatField()               # 95% CI upper bound
     evidence_status = models.CharField(max_length=30)  # INSUFFICIENT_SAMPLE, POSITIVE, NEGATIVE, NEUTRAL
     sufficient_sample = models.BooleanField()    # Whether sample size meets minimum threshold
+    average_cost = models.FloatField(default=0.0)      # Observed average intervention cost
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -82,3 +87,24 @@ class Policy(models.Model):
 
     def __str__(self):
         return f"Policy v{self.version} | {self.segment} → {self.action}"
+
+class CustomerState(models.Model):
+    """Tracks customer-level safety constraints."""
+    customer_id = models.CharField(max_length=100, primary_key=True)
+    opted_out = models.BooleanField(default=False)
+    contact_count = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return f"Customer {self.customer_id} (Opt-out: {self.opted_out}, Contacts: {self.contact_count})"
+
+class Execution(models.Model):
+    """Tracks an actual allocated intervention."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='executions')
+    action = models.CharField(max_length=50)
+    expected_net_value = models.FloatField()
+    estimated_cost = models.FloatField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Execution: {self.action} for Tx {self.transaction_id} (Net Value: {self.expected_net_value})"
