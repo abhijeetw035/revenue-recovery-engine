@@ -56,7 +56,9 @@ for tx in txs[10:20]:
 
 budget_limit = 50000.0  # Large budget to see full impact
 
-def run_evaluation_pass(pass_number):
+import json
+
+def run_evaluation_pass(pass_number, save_to_file=False):
     print(f"\n=== Evaluation Pass {pass_number} ===")
     
     # Ensure database state is pristine for the evaluation
@@ -80,7 +82,12 @@ def run_evaluation_pass(pass_number):
         incr = metrics.get('incremental_recovery_vs_naive', 0.0)
         
         print(f"{strategy:<16} | {rate:>8.2f}% | {gross:>10.2f} | {cost:>8.2f} | {net:>10.2f} | {incr:>12.2f}")
+        
+    if save_to_file:
+        with open("demo_impact.json", "w") as f:
+            json.dump(report, f, indent=2)
+        print("\nSaved evaluation results to demo_impact.json")
 
 # Run twice to verify deterministic results
 run_evaluation_pass(1)
-run_evaluation_pass(2)
+run_evaluation_pass(2, save_to_file=True)
