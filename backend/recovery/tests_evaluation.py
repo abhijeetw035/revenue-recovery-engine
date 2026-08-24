@@ -59,12 +59,25 @@ class EvaluationTest(TestCase):
             self.assertEqual(action, 'IMMEDIATE_RETRY')
             
     def test_static_baseline(self):
+        # tx1 (amount 100), tx2 (amount 200), tx3 (amount 300) are all < 5000.
+        # Let's add a high value transaction.
+        tx4 = Transaction.objects.create(
+            amount=6000.0,
+            payment_method='UPI',
+            failure_reason='Technical Decline',
+            customer_id='CUST_004',
+            segment='UPI | Technical Decline | HIGH_VALUE',
+            risk_level='LOW',
+            status='PENDING'
+        )
         transactions = list(Transaction.objects.all().order_by('amount'))
         decisions = run_static_baseline(transactions)
         
-        self.assertEqual(decisions[0][1], 'DELAYED_RETRY') # Insufficient Funds
-        self.assertEqual(decisions[1][1], 'IMMEDIATE_RETRY') # Technical Decline
-        self.assertEqual(decisions[2][1], 'NONE') # Risk Block
+        # amounts: 100, 200, 300, 6000
+        self.assertEqual(decisions[0][1], 'IMMEDIATE_RETRY') # <= 5000
+        self.assertEqual(decisions[1][1], 'IMMEDIATE_RETRY') # <= 5000
+        self.assertEqual(decisions[2][1], 'IMMEDIATE_RETRY') # <= 5000
+        self.assertEqual(decisions[3][1], 'WHATSAPP') # > 5000
         
     def test_evaluate_decisions(self):
         decisions = [(self.tx1, 'NONE'), (self.tx2, 'NONE')]

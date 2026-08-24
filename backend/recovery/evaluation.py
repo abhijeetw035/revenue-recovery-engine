@@ -74,19 +74,20 @@ def run_naive_baseline(transactions: list[Transaction]) -> list[tuple[Transactio
 
 def run_static_baseline(transactions: list[Transaction]) -> list[tuple[Transaction, str]]:
     """
-    Static baseline: Fixed rules based on failure reason.
+    Static baseline: A fixed, non-learning heuristic based on observable transaction characteristics.
+    
+    Heuristic Rationale:
+    A common industry practice is to use high-touch, slightly more expensive engagement (WHATSAPP) 
+    for high-value transactions (> 5000) to ensure the customer sees it, and a cheap automated 
+    approach (IMMEDIATE_RETRY) for everything else. This rule is defined completely independently 
+    of the hidden simulator's causal effects.
     """
     decisions = []
     for tx in transactions:
-        action = 'NONE'
-        if tx.failure_reason == 'Insufficient Funds':
-            action = 'DELAYED_RETRY'
-        elif tx.failure_reason == 'Technical Decline':
+        if float(tx.amount) > 5000:
+            action = 'WHATSAPP'
+        else:
             action = 'IMMEDIATE_RETRY'
-        elif tx.failure_reason == 'Risk Block':
-            action = 'NONE'
-        elif tx.failure_reason == 'Invalid Details':
-            action = 'SMS'
         decisions.append((tx, action))
     return decisions
 
