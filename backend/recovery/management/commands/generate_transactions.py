@@ -64,7 +64,7 @@ class Command(BaseCommand):
             segment = f"{pm} | {fr} | {band}"
 
             tx = Transaction(
-                id=uuid.uuid4(),
+                id=uuid.uuid5(uuid.NAMESPACE_OID, f"tx_{seed}_{i}"),
                 amount=amount,
                 payment_method=pm,
                 failure_reason=fr,
